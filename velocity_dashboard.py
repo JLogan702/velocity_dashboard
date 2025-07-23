@@ -7,7 +7,7 @@ import os
 st.set_page_config(page_title="Team Velocity Dashboard", layout="wide")
 st.title("🚀 Team Sprint Velocity Dashboard")
 
-# Load data: use uploaded file if provided, otherwise load default
+# Load data: uploaded or default
 uploaded_file = st.file_uploader("📤 Upload your Sprint Velocity Excel file", type=["xlsx"])
 
 if uploaded_file is not None:
@@ -21,6 +21,23 @@ else:
     else:
         st.error("❌ No file uploaded and no default file found. Please upload a valid .xlsx file.")
         st.stop()
+
+# Sprint name mapping
+SPRINT_NAME_MAP = {
+    "Sprint 5": "Design Sprint 5: 5/7 - 5/21",
+    "Sprint 6": "Design Sprint 6: 5/21 - 6/4",
+    "Sprint 7": "Design Sprint 7: 6/4 - 6/18",
+    "Sprint 8": "Design Sprint 8: 6/18 - 7/2",
+    "Sprint 9": "Design Sprint 9: 7/2 - 7/16",
+    "ML Ops Sprint": "Eng-ML Ops Sprint 7: 7/2 - 7/16",
+    "Eng Sprint 6": "Eng-AIOps Sprint 6: 5/21 - 6/4",
+    "Platform Sprint 5": "Eng-Platform Sprint 5: 5/7 - 5/21",
+    "Platform Sprint 8": "Eng-Platform Sprint 8: 6/18 - 7/2",
+    "Product Sprint 5": "Eng-Prod Sprint 5: 5/7 - 5/21"
+}
+
+# Apply mapping
+df["Sprint"] = df["Sprint"].replace(SPRINT_NAME_MAP)
 
 # Show raw data
 st.subheader("📄 Raw Velocity Data")
