@@ -1,59 +1,78 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import base64
 import streamlit as st
-import seaborn as sns
+from datetime import datetime
 
-# Load Excel data
-excel_file = "Velocity_Data.xlsx"
-df = pd.read_excel(excel_file)
+# Load the spreadsheet
+df = pd.read_excel("Velocity_Data.xlsx")
 
-# Clean and sort
-df = df.dropna(subset=["Team", "Sprint", "Committed", "Completed"])
-df["Sprint"] = df["Sprint"].astype(str)
-df["Velocity"] = df["Completed"] / df["Committed"]
-df.sort_values(by=["Team", "Sprint"], inplace=True)
+# Clean and convert dates
+df['Start Date'] = pd.to_datetime(df['Start Date'], errors='coerce')
+df['End Date'] = pd.to_datetime(df['End Date'], errors='coerce')
 
-# App layout
+# Hardcoded sprint names from visuals
+sprint_name_mapping = {
+    "Data Sprint 7": "Data Sprint 7 – 6/4–6/18",
+    "Data Sprint 8": "Data Sprint 8 – 6/18–7/2",
+    "Data Sprint 9": "Data Sprint 9 – 7/2–7/16",
+    "Eng-Platform Sprint 7": "Eng-Platform Sprint 7 – 6/4–6/18",
+    "Eng-Platform Sprint 8": "Eng-Platform Sprint 8 – 6/18–7/2",
+    "Eng-Platform Sprint 9": "Eng-Platform Sprint 9 – 7/2–7/16",
+    "Eng-Prod Sprint 8": "Eng-Prod Sprint 8 – 6/18–7/7",
+    "Eng-Prod Sprint 9": "Eng-Prod Sprint 9 – 7/8–7/15",
+    "Eng-AIOps Sprint 7": "Eng-AIOps Sprint 7 – 6/4–6/18",
+    "Eng-AIOps Sprint 8": "Eng-AIOps Sprint 8 – 6/18–7/2",
+    "Eng-AIOps Sprint 9": "Eng-AIOps Sprint 9 – 7/2–7/16",
+    "Design Sprint 7": "Design Sprint 7 – 6/4–6/18",
+    "Design Sprint 8": "Design Sprint 8 – 6/18–7/2",
+    "Design Sprint 9": "Design Sprint 9 – 7/2–7/16",
+}
+
+df["Sprint Display"] = df["Sprint Name"].map(sprint_name_mapping)
+df = df.sort_values(by=["Team Name", "Start Date"])
+
+# Streamlit UI
 st.set_page_config(page_title="Team Average Velocity Dashboard", layout="wide")
-
-# Logo and Title
 st.image("Clarvos_Logo2025_FullColor.png", width=200)
 st.title("Team Average Velocity Dashboard")
+st.markdown("Compare Story Points *Committed vs Completed* across teams and sprints.")
 
-# Select team
-teams = df["Team"].unique()
-selected_team = st.selectbox("Select a team", teams)
+# Plot by team
+teams = df["Team Name"].unique()
+for team in teams:
+    team_df = df[df["Team Name"] == team]
 
-# Filter data
-team_df = df[df["Team"] == selected_team]
+    fig, ax = plt.subplots(figsize=(10, 4))
+    index = range(len(team_df))
+    bar_width = 0.35
 
-# Line chart - Velocity over Sprints
-st.subheader(f"Velocity Trend - {selected_team}")
-fig1, ax1 = plt.subplots(figsize=(10, 4))
-sns.lineplot(data=team_df, x="Sprint", y="Velocity", marker="o", ax=ax1)
-ax1.set_ylim(0, 2)
-ax1.axhline(1.0, ls="--", c="gray", label="Target Velocity")
-ax1.set_ylabel("Velocity (Completed / Committed)")
-ax1.set_xlabel("Sprint")
-ax1.set_title("Velocity Over Time")
-ax1.legend()
-st.pyplot(fig1)
+    ax.bar(index, team_df["Story Points Committed"], bar_width, label="Committed")
+    ax.bar(
+        [i + bar_width for i in index],
+        team_df["Story Points Completed"],
+        bar_width,
+        label="Completed",
+    )
 
-# Bar chart - Committed vs Completed
-st.subheader(f"Committed vs Completed - {selected_team}")
-fig2, ax2 = plt.subplots(figsize=(10, 4))
-width = 0.35
-x = range(len(team_df))
-ax2.bar(x, team_df["Committed"], width, label="Committed", color="#5B8DEF")
-ax2.bar([i + width for i in x], team_df["Completed"], width, label="Completed", color="#6DD3CE")
-ax2.set_xticks([i + width / 2 for i in x])
-ax2.set_xticklabels(team_df["Sprint"], rotation=45)
-ax2.set_ylabel("Story Points")
-ax2.set_title("Committed vs Completed Story Points")
-ax2.legend()
-st.pyplot(fig2)
+    ax.set_xlabel("Sprint")
+    ax.set_ylabel("Story Points")
+    ax.set_title(f"{team} Velocity")
+    ax.set_xticks([i + bar_width / 2 for i in index])
+    ax.set_xticklabels(team_df["Sprint Display"], rotation=45, ha="right")
+    ax.legend()
 
-# Data Table
-st.subheader(f"Sprint Summary - {selected_team}")
-st.dataframe(team_df[["Sprint", "Committed", "Completed", "Velocity"]].reset_index(drop=True))
+    st.pyplot(fig)
+
+# Table
+st.markdown("### 📊 Full Velocity Table")
+st.dataframe(df[["Team Name", "Sprint Display", "Story Points Committed", "Story Points Completed"]])
+
+# CSV Download
+csv = df.to_csv(index=False)
+b64 = base64.b64encode(csv.encode()).decode()
+st.markdown(
+    f"⬇️ [Download full data as CSV](data:file/csv;base64,{b64})",
+    unsafe_allow_html=True,
+)
 
