@@ -1,77 +1,59 @@
-import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import streamlit as st
 import seaborn as sns
-import os
 
-# ----- Page Configuration -----
-st.set_page_config(
-    page_title="Clarvos | Team Average Velocity Dashboard",
-    layout="wide"
-)
+# Load Excel data
+excel_file = "Velocity_Data.xlsx"
+df = pd.read_excel(excel_file)
 
-# ----- Logo and Header -----
-logo_path = "Clarvos_Logo2025_FullColor.png"
-if os.path.exists(logo_path):
-    st.image(logo_path, width=250)
-st.title("📊 Team Average Velocity Dashboard")
+# Clean and sort
+df = df.dropna(subset=["Team", "Sprint", "Committed", "Completed"])
+df["Sprint"] = df["Sprint"].astype(str)
+df["Velocity"] = df["Completed"] / df["Committed"]
+df.sort_values(by=["Team", "Sprint"], inplace=True)
 
-# ----- File Upload or Default -----
-uploaded_file = st.file_uploader("Upload your Sprint Velocity Excel file", type=["xlsx"])
+# App layout
+st.set_page_config(page_title="Team Average Velocity Dashboard", layout="wide")
 
-if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file)
-else:
-    default_file = "Sprint_Velocity_Per_Team.xlsx"
-    if os.path.exists(default_file):
-        df = pd.read_excel(default_file)
-    else:
-        st.error("No file uploaded and no default file found.")
-        st.stop()
+# Logo and Title
+st.image("Clarvos_Logo2025_FullColor.png", width=200)
+st.title("Team Average Velocity Dashboard")
 
-# ----- Sprint Name Mapping -----
-SPRINT_NAME_MAP = {
-    "Sprint 5": "Design Sprint 5: 5/7 - 5/21",
-    "Sprint 6": "Design Sprint 6: 5/21 - 6/4",
-    "Sprint 7": "Design Sprint 7: 6/4 - 6/18",
-    "Sprint 8": "Design Sprint 8: 6/18 - 7/2",
-    "Sprint 9": "Design Sprint 9: 7/2 - 7/16",
-    "ML Ops Sprint": "Eng-ML Ops Sprint 7: 7/2 - 7/16",
-    "Eng Sprint 6": "Eng-AIOps Sprint 6: 5/21 - 6/4",
-    "Platform Sprint 5": "Eng-Platform Sprint 5: 5/7 - 5/21",
-    "Platform Sprint 8": "Eng-Platform Sprint 8: 6/18 - 7/2",
-    "Product Sprint 5": "Eng-Prod Sprint 5: 5/7 - 5/21"
-}
-df["Sprint"] = df["Sprint"].replace(SPRINT_NAME_MAP)
+# Select team
+teams = df["Team"].unique()
+selected_team = st.selectbox("Select a team", teams)
 
-# ----- Compute Velocity Averages -----
-avg_velocity_df = df.groupby("Team").agg(
-    Avg_Velocity=("Velocity", "mean"),
-    Sprint_Count=("Sprint", "count")
-).reset_index().sort_values(by="Avg_Velocity", ascending=False)
+# Filter data
+team_df = df[df["Team"] == selected_team]
 
-# ----- Chart: Average Velocity per Team -----
-st.subheader("📈 Average Velocity per Team")
-fig1, ax1 = plt.subplots(figsize=(10, 5))
-sns.barplot(data=avg_velocity_df, x="Team", y="Avg_Velocity", palette="viridis", ax=ax1)
-ax1.axhline(1.0, color="gray", linestyle="--", label="Target = 1.0")
-ax1.set_ylabel("Average Velocity (Completed / Committed)")
-ax1.set_ylim(0, max(avg_velocity_df["Avg_Velocity"].max() + 0.2, 1.5))
+# Line chart - Velocity over Sprints
+st.subheader(f"Velocity Trend - {selected_team}")
+fig1, ax1 = plt.subplots(figsize=(10, 4))
+sns.lineplot(data=team_df, x="Sprint", y="Velocity", marker="o", ax=ax1)
+ax1.set_ylim(0, 2)
+ax1.axhline(1.0, ls="--", c="gray", label="Target Velocity")
+ax1.set_ylabel("Velocity (Completed / Committed)")
+ax1.set_xlabel("Sprint")
+ax1.set_title("Velocity Over Time")
 ax1.legend()
 st.pyplot(fig1)
 
-# ----- Chart: Sprint Count per Team -----
-st.subheader("📊 Sprint Participation Volume")
+# Bar chart - Committed vs Completed
+st.subheader(f"Committed vs Completed - {selected_team}")
 fig2, ax2 = plt.subplots(figsize=(10, 4))
-sns.barplot(data=avg_velocity_df, x="Team", y="Sprint_Count", palette="mako", ax=ax2)
-ax2.set_ylabel("Sprint Count")
+width = 0.35
+x = range(len(team_df))
+ax2.bar(x, team_df["Committed"], width, label="Committed", color="#5B8DEF")
+ax2.bar([i + width for i in x], team_df["Completed"], width, label="Completed", color="#6DD3CE")
+ax2.set_xticks([i + width / 2 for i in x])
+ax2.set_xticklabels(team_df["Sprint"], rotation=45)
+ax2.set_ylabel("Story Points")
+ax2.set_title("Committed vs Completed Story Points")
+ax2.legend()
 st.pyplot(fig2)
 
-# ----- Chart: Velocity Distribution -----
-st.subheader("📉 Velocity Distribution Across Teams and Sprints")
-fig3, ax3 = plt.subplots(figsize=(10, 5))
-sns.stripplot(data=df, x="Team", y="Velocity", hue="Sprint", jitter=True, dodge=True, alpha=0.8)
-ax3.axhline(1.0, color="gray", linestyle="--", linewidth=1)
-ax3.set_ylabel("Velocity")
-ax3.set_title("Velocity by Team per Sprint")
-st.pyplot(fig3)
+# Data Table
+st.subheader(f"Sprint Summary - {selected_team}")
+st.dataframe(team_df[["Sprint", "Committed", "Completed", "Velocity"]].reset_index(drop=True))
+
